@@ -18,20 +18,30 @@ async def speak_edge_tts(text, voice="en-US-AriaNeural", rate="+0%", pitch="+0Hz
     try:
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-            await communicate.save(tmp_file.name)
+        # Create a uniquely named temp file and close it before Edge-TTS writes
+        # to it. On Windows, keeping the file open will prevent other writers
+        # from opening the same path.
+        fd, tmp_path = tempfile.mkstemp(suffix=".mp3")
+        os.close(fd)
+
+        try:
+            await communicate.save(tmp_path)
 
             # Play using pygame
             pygame.mixer.init()
-            pygame.mixer.music.load(tmp_file.name)
+            pygame.mixer.music.load(tmp_path)
             pygame.mixer.music.play()
 
             while pygame.mixer.music.get_busy():
                 pygame.time.wait(100)
 
             pygame.mixer.quit()
-
-        os.unlink(tmp_file.name)
+        finally:
+            # Ensure we remove the temp file
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
     except Exception as e:
         print(f"Edge-TTS Error: {e}")

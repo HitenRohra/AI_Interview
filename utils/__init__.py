@@ -1,40 +1,45 @@
-from .analyze_candidate import (
-    analyze_candidate_response_and_generate_new_question,
-    get_feedback_of_candidate_response,
-)
-from .load_content import load_content, load_content_streamlit
-from .record_utils import (
-    validate_audio_file,
-    record_audio_with_interrupt,
-    reduce_noise,
-)
-from .save_interview_data import save_interview_data
-from .text_to_speech import speak_text
-from .transcript_audio import transcribe_with_speechmatics
-from .basic_details import (
-    get_ai_greeting_message,
-    extract_resume_info_using_llm,
-    get_final_thanks_message,
-)
-from .evaluation import get_overall_evaluation_score
-from .prompts import basic_details, next_question_generation, feedback_generation
+"""Utility package exports.
 
-__all__ = [
-    "analyze_candidate_response_and_generate_new_question",
-    "load_content",
-    "validate_audio_file",
-    "record_audio_with_interrupt",
-    "reduce_noise",
-    "save_interview_data",
-    "speak_text",
-    "transcribe_with_speechmatics",
-    "get_ai_greeting_message",
-    "extract_resume_info_using_llm",
-    "get_feedback_of_candidate_response",
-    "get_overall_evaluation_score",
-    "basic_details",
-    "next_question_generation",
-    "feedback_generation",
-    "load_content_streamlit",
-    "get_final_thanks_message",
-]
+This module implements lazy attribute access so importing `utils`
+doesn't immediately import heavy optional dependencies (audio,
+PDF parsing, TTS, etc.). Attributes are loaded on demand.
+"""
+from typing import Any
+import importlib
+import types
+
+_EXPORTS = {
+    "analyze_candidate_response_and_generate_new_question": (
+        "analyze_candidate", "analyze_candidate_response_and_generate_new_question"
+    ),
+    "get_feedback_of_candidate_response": ("analyze_candidate", "get_feedback_of_candidate_response"),
+    "load_content": ("load_content", "load_content"),
+    "load_content_streamlit": ("load_content", "load_content_streamlit"),
+    "validate_audio_file": ("record_utils", "validate_audio_file"),
+    "record_audio_with_interrupt": ("record_utils", "record_audio_with_interrupt"),
+    "reduce_noise": ("record_utils", "reduce_noise"),
+    "save_interview_data": ("save_interview_data", "save_interview_data"),
+    "speak_text": ("text_to_speech", "speak_text"),
+    "transcribe_with_speechmatics": ("transcript_audio", "transcribe_with_speechmatics"),
+    "get_ai_greeting_message": ("basic_details", "get_ai_greeting_message"),
+    "extract_resume_info_using_llm": ("basic_details", "extract_resume_info_using_llm"),
+    "get_final_thanks_message": ("basic_details", "get_final_thanks_message"),
+    "get_overall_evaluation_score": ("evaluation", "get_overall_evaluation_score"),
+    "basic_details": ("prompts", "basic_details"),
+    "next_question_generation": ("prompts", "next_question_generation"),
+    "feedback_generation": ("prompts", "feedback_generation"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily import the requested attribute from the appropriate submodule."""
+    if name in _EXPORTS:
+        module_name, attr_name = _EXPORTS[name]
+        module = importlib.import_module(f"utils.{module_name}")
+        return getattr(module, attr_name)
+    raise AttributeError(f"module 'utils' has no attribute '{name}'")
+
+
+def __dir__() -> list[str]:
+    return sorted(list(_EXPORTS.keys()))
+

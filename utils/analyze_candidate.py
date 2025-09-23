@@ -30,7 +30,7 @@ async def _make_llm_call_async(prompt: str) -> Dict[str, Any]:
     except Exception as e:
         raise InterviewAnalysisError(f"Failed to get LLM response: {str(e)}")
 
-async def get_next_question(
+async def get_next_question_async(
     previous_question: str, 
     candidate_response: str, 
     resume_highlights: str, 
@@ -58,18 +58,18 @@ async def get_next_question(
             resume_highlights=resume_highlights,
             job_description=job_description,
         )
-        
+
         response = await _make_llm_call_async(final_prompt)
-        
+
         if "next_question" not in response:
             raise InterviewAnalysisError("Missing 'next_question' in LLM response")
-            
+
         return response["next_question"]
-        
+
     except Exception as e:
         raise InterviewAnalysisError(f"Question generation failed: {str(e)}")
 
-async def get_feedback_of_candidate_response(
+async def get_feedback_of_candidate_response_async(
     question: str, 
     candidate_response: str, 
     job_description: str, 
@@ -97,15 +97,15 @@ async def get_feedback_of_candidate_response(
             job_description=job_description,
             resume_highlights=resume_highlights,
         )
-        
+
         response = await _make_llm_call_async(final_prompt)
-        
+
         # Validate response structure
         required_fields = ["feedback", "score"]
         missing_fields = [field for field in required_fields if field not in response]
         if missing_fields:
             raise InterviewAnalysisError(f"Missing fields in response: {missing_fields}")
-        
+
         # Validate score is numeric
         try:
             score = float(response["score"])
@@ -113,16 +113,16 @@ async def get_feedback_of_candidate_response(
                 print(f"Score {score} is outside expected range 0-10")
         except (ValueError, TypeError):
             raise InterviewAnalysisError(f"Invalid score format: {response['score']}")
-        
+
         return {
             "feedback": response["feedback"],
             "score": response["score"]
         }
-        
+
     except Exception as e:
         raise InterviewAnalysisError(f"Feedback generation failed: {str(e)}")
 
-async def analyze_candidate_response_and_generate_new_question(
+async def analyze_candidate_response_and_generate_new_question_async(
     question: str, 
     candidate_response: str, 
     job_description: str, 
@@ -148,11 +148,11 @@ async def analyze_candidate_response_and_generate_new_question(
     """
     try:
         # Run both operations concurrently for better performance
-        feedback_task = get_feedback_of_candidate_response(
+        feedback_task = get_feedback_of_candidate_response_async(
             question, candidate_response, job_description, resume_highlights
         )
         
-        next_question_task = get_next_question(
+        next_question_task = get_next_question_async(
             question, candidate_response, resume_highlights, job_description
         )
         
@@ -166,3 +166,56 @@ async def analyze_candidate_response_and_generate_new_question(
         raise
     except Exception as e:
         raise InterviewAnalysisError(f"Response analysis failed: {str(e)}")
+
+
+# --- Synchronous wrapper helpers ---
+def _run_coro_sync(coro, timeout: float | None = None):
+    """
+    Run an async coroutine from synchronous code. Uses asyncio.run which
+    requires no running event loop. This is simple and suitable for CLI
+    usage. If an event loop is already running, this will raise a
+    RuntimeError.
+    """
+    try:
+        if timeout is None:
+            return asyncio.run(coro)
+        else:
+            # wrap with asyncio.wait_for to apply timeout at top-level
+            return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+    except RuntimeError as e:
+        # Likely: "asyncio.run() cannot be called from a running event loop"
+        raise InterviewAnalysisError(
+            "Cannot run async coroutine synchronously because an event loop is already running."
+        ) from e
+
+
+def get_feedback_of_candidate_response(
+    question: str, 
+    candidate_response: str, 
+    job_description: str, 
+    resume_highlights: str,
+    timeout: float = 30.0,
+) -> Dict[str, Any]:
+    """Synchronous wrapper around the async feedback generator."""
+    return _run_coro_sync(
+        get_feedback_of_candidate_response_async(
+            question, candidate_response, job_description, resume_highlights
+        ),
+        timeout,
+    )
+
+
+def analyze_candidate_response_and_generate_new_question(
+    question: str, 
+    candidate_response: str, 
+    job_description: str, 
+    resume_highlights: str,
+    timeout: float = 30.0,
+) -> Tuple[str, Dict[str, Any]]:
+    """Synchronous wrapper around the async analyze+generate function."""
+    return _run_coro_sync(
+        analyze_candidate_response_and_generate_new_question_async(
+            question, candidate_response, job_description, resume_highlights, timeout
+        ),
+        timeout,
+    )

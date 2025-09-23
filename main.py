@@ -1,20 +1,7 @@
 from dotenv import load_dotenv
 import os
 from datetime import datetime
-from utils import (
-    record_audio_with_interrupt,
-    validate_audio_file,
-    reduce_noise,
-    transcribe_with_speechmatics,
-    extract_resume_info_using_llm,
-    get_ai_greeting_message,
-    speak_text,
-    analyze_candidate_response_and_generate_new_question,
-    load_content,
-    save_interview_data,
-    get_feedback_of_candidate_response,
-    get_overall_evaluation_score,
-)
+import utils
 
 load_dotenv()
 MAX_QUESTIONS = 5
@@ -26,19 +13,19 @@ def record_and_transcribe(candidate_name, question_answer_number):
 
     filename = f"audio/{candidate_name}/{candidate_name}_{question_answer_number}.wav"
 
-    audio_file, fs = record_audio_with_interrupt(filename=filename)
+    audio_file, fs = utils.record_audio_with_interrupt(filename=filename)
 
-    if not validate_audio_file(audio_file):
+    if not utils.validate_audio_file(audio_file):
         print("Warning: Audio file seems invalid or too quiet")
         return "No valid audio recorded"
 
-    audio_file = reduce_noise(audio_file, fs)
+    audio_file = utils.reduce_noise(audio_file, fs)
 
-    if not validate_audio_file(audio_file):
+    if not utils.validate_audio_file(audio_file):
         print("Warning: Audio file seems invalid after noise reduction")
         return "No valid audio after processing"
 
-    transcript = transcribe_with_speechmatics(audio_file)
+    transcript = utils.transcribe_with_speechmatics(audio_file)
     return transcript
 
 
@@ -50,15 +37,15 @@ def start_interview_with_ai(
 
     # Step 1: AI Greeting and first question
     print("Starting AI Interview...")
-    ai_greeting_message = get_ai_greeting_message(name)
-    speak_text(ai_greeting_message)
+    ai_greeting_message = utils.get_ai_greeting_message(name)
+    utils.speak_text(ai_greeting_message)
 
     # Step 2: Record and transcribe first response
     print("Please answer the question...")
     candidate_response = record_and_transcribe(name, question_answer_number)
 
     # Step 3: Analyze first response and generate next question
-    next_question, feedback = analyze_candidate_response_and_generate_new_question(
+    next_question, feedback = utils.analyze_candidate_response_and_generate_new_question(
         ai_greeting_message, candidate_response, job_description, resume_highlights
     )
 
@@ -77,7 +64,7 @@ def start_interview_with_ai(
         print(f"Question {i+2} of {max_questions + 1}")
 
         # Ask next question
-        speak_text(next_question)
+        utils.speak_text(next_question)
 
         # Record and transcribe response
         print("Please answer the question...")
@@ -86,7 +73,7 @@ def start_interview_with_ai(
         # Analyze response and generate next question (for next iteration)
         if i < max_questions - 1:  # Don't generate next question for last iteration
             next_question_temp, feedback = (
-                analyze_candidate_response_and_generate_new_question(
+                utils.analyze_candidate_response_and_generate_new_question(
                     next_question,
                     candidate_response,
                     job_description,
@@ -96,7 +83,7 @@ def start_interview_with_ai(
             next_question = next_question_temp
         else:
             # For last question, just get feedback
-            feedback = get_feedback_of_candidate_response(
+            feedback = utils.get_feedback_of_candidate_response(
                 next_question, candidate_response, job_description, resume_highlights
             )
 
@@ -113,7 +100,7 @@ def start_interview_with_ai(
     # Step 5: Conclude interview
     closing_message = f"Thank you {name} for your time today. This concludes our interview. We will get back to you soon with the results. Have a great day!"
     print(closing_message)
-    speak_text(closing_message)
+    utils.speak_text(closing_message)
     print("Interview completed!")
 
     return conversations
@@ -137,6 +124,11 @@ def app():
         print(f"Error: Job description file not found at {job_desc_path}")
         return
 
+    # Import the load_content function explicitly to avoid package attribute
+    # collisions where `utils.load_content` may point to the submodule object.
+    import importlib
+
+    load_content = importlib.import_module("utils.load_content").load_content
     resume_content = load_content(resume_path)
     job_description = load_content(job_desc_path)
 
@@ -146,7 +138,7 @@ def app():
 
     # Step 2: Extract candidate information using LLM
     print("Step 2: Extracting candidate information...")
-    name, resume_highlights = extract_resume_info_using_llm(resume_content)
+    name, resume_highlights = utils.extract_resume_info_using_llm(resume_content)
 
     # Step 3: Get confirmation to start interview
     print(f"Step 3: Ready to interview {name}")
@@ -164,7 +156,7 @@ def app():
 
     # Step 5: Calculate overall score and prepare final data
     print("Step 5: Calculating final results...")
-    final_evaluation_score = get_overall_evaluation_score(conversations)
+    final_evaluation_score = utils.get_overall_evaluation_score(conversations)
 
     # Step 6: Prepare final interview data according to JSON schema
     current_time = datetime.now().isoformat() + "Z"
@@ -182,7 +174,7 @@ def app():
 
     # Step 7: Save results
     print("Step 6: Saving results...")
-    save_interview_data(interview_data, candidate_name=name)
+    utils.save_interview_data(interview_data, candidate_name=name)
 
     print(f"\n=== Interview Summary ===")
     print(f"Candidate: {name}")
