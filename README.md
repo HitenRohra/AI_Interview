@@ -6,10 +6,10 @@ An **intelligent interview platform** that conducts automated job interviews usi
 
 ## 🎥 Demo Video
 
-<video src="https://raw.githubusercontent.com/HitenRohra/AI_Interview/main/demo_video_.mp4" controls autoplay loop muted playsinline width="100%"></video>
+[![Watch the demo](demo_preview.gif)](https://github.com/HitenRohra/AI_Interview/blob/main/demo_video_.mp4)
 
+*(Click the preview to watch the full video)*
 
----
 
 ## ✨ Features
 
